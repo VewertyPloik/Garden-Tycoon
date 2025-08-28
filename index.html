@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Garden Tycoon</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#0f172a;
+    --panel-2:#111827;
+    --ink:#e5e7eb;
+    --muted:#94a3b8;
+    --accent:#22d3ee;
+    --good:#34d399;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --green:#0a3d1a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background: radial-gradient(1200px 600px at 70% -20%, #12203a 0%, var(--bg) 50%, #070b16 100%);
+    color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    display:flex; align-items:center; justify-content:center; padding:10px;
+  }
+  .app{width:min(720px, 100%); max-width:720px;}
+  .hud{display:flex; flex-wrap:wrap; align-items:center; gap:8px; justify-content:space-between; margin-bottom:10px;}
+  .brand{display:flex; align-items:center; gap:6px}
+  .brand .logo{width:24px; height:24px; border-radius:6px; background:linear-gradient(135deg,#3b82f6, #22d3ee);}
+  .brand h1{font-size:14px; margin:0; letter-spacing:.4px}
+  .money{font-weight:700; font-size:13px; padding:6px 10px; border-radius:10px; background:linear-gradient(180deg, #0b1224, #0a0f1d); border:1px solid #1f2937;}
+  .controls{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .boost-pill{font-size:12px; padding:6px 8px; border-radius:999px; border:1px solid #2b3a52; background:linear-gradient(180deg,#0e1a34,#0c162a); display:none}
+  .boost-pill.active{display:inline-flex; gap:6px; align-items:center}
+  .boost-dot{width:8px; height:8px; border-radius:50%; background:var(--accent)}
+  button{cursor:pointer; color:var(--ink); background:linear-gradient(180deg,#1f2937,#0f172a);
+    border:1px solid #263244; padding:6px 8px; border-radius:8px; font-weight:600; font-size:12px;}
+  .danger{border-color:#3b1e1e; background:linear-gradient(180deg,#3b1e1e,#2a1616)}
+  .grid-wrap{background:linear-gradient(180deg, #0c162a, #0b1324); border:1px solid #1f2a3b; border-radius:12px; padding:10px;}
+  .grid{display:grid; grid-template-columns:repeat(3, 1fr); grid-template-rows:repeat(3, 1fr); gap:8px;}
+  .tile{position:relative; aspect-ratio:1/1; border-radius:10px; background:linear-gradient(180deg, #0b2a12, #06220d); border:1px solid #0f3d1a;}
+  .tile button{position:absolute; inset:0; width:100%; height:100%; background:transparent; border:0}
+  .soil{position:absolute; inset:0; background:repeating-linear-gradient(180deg, #0e4a22 0 4px, #0b3c1b 4px 8px); opacity:.25}
+  .plant{position:absolute; width:60%; height:60%; left:20%; top:20%; border-radius:6px; font-size:10px; font-weight:800;}
+  .plant.ready{outline:2px solid var(--good)}
+  .progress{position:absolute; left:6px; right:6px; bottom:6px; height:6px; border-radius:4px; background:#0b1b34;}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg, #22c55e, #a3e635)}
+  .tag{position:absolute; top:4px; left:4px; font-size:9px; padding:2px 5px; border-radius:999px; background:rgba(0,0,0,.3)}
+  .action{position:absolute; right:4px; top:4px; font-size:9px; padding:2px 5px; border-radius:999px; background:rgba(255,255,255,.1)}
+
+  /* Modal */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center}
+  .modal{width:min(520px, 100%); background:linear-gradient(180deg,#0b1224,#0a0f1d); border:1px solid #1f2937; border-top-left-radius:12px; border-top-right-radius:12px; padding:10px;}
+  .modal h2{margin:4px 6px 6px; font-size:14px}
+  .shop{display:grid; gap:6px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); padding:6px; max-height:60vh; overflow:auto}
+  .card{padding:8px; border-radius:10px; border:1px solid #263244; background:linear-gradient(180deg,#121a2e,#0f172a); display:flex; gap:6px; align-items:center; justify-content:space-between; font-size:12px}
+  .seed-swatch{width:20px; height:20px; border-radius:4px;}
+  .card small{display:block; color:var(--muted); font-size:10px}
+  .close-row{display:flex; justify-content:flex-end; padding:4px}
+  .ghost{background:transparent; border-color:#263244; font-size:12px;}
+  .disabled{opacity:.5; pointer-events:none}
+  .warn{color:var(--warn)}
+  .ok{color:var(--good)}
+
+  @media (min-width:740px){ .modal-backdrop{align-items:center} .modal{border-radius:12px} }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="hud">
+      <div class="brand"><div class="logo"></div><h1>3×3 Farm Tycoon</h1></div>
+      <div class="money" id="money">$0</div>
+      <div class="controls">
+        <span id="boostPill" class="boost-pill"><span class="boost-dot"></span><span id="boostLabel">No boost</span></span>
+        <button id="upgradeBtn">⚡ Upgrades</button>
+        <button id="saveBtn">💾 Save</button>
+        <button id="resetBtn" class="danger">♻️ Reset</button>
+      </div>
+    </div>
+    <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+  </div>
+
+  <!-- Seed Shop Modal -->
+  <div class="modal-backdrop" id="shopModal">
+    <div class="modal">
+      <h2>Seed Shop</h2>
+      <div class="shop" id="shopList"></div>
+      <div class="close-row"><button class="ghost" id="closeShop">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Upgrade Shop Modal -->
+  <div class="modal-backdrop" id="upgradeModal">
+    <div class="modal">
+      <h2>Upgrade Shop</h2>
+      <div class="shop" id="upgradeList"></div>
+      <div class="close-row"><button class="ghost" id="closeUpgrade">Close</button></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const fmtShort=n=>{const a=Math.abs(n);if(a>=1e12)return`$${(n/1e12).toFixed(3)}T`;if(a>=1e9)return`$${(n/1e9).toFixed(3)}B`;if(a>=1e6)return`$${(n/1e6).toFixed(2)}M`;if(a>=1e3)return`$${(n/1e3).toFixed(1)}K`;return`$${Math.floor(n).toLocaleString()}`};
+  const fmtMMSS=ms=>{if(ms<=0)return'0:00'; let s=Math.ceil(ms/1000); const m=Math.floor(s/60); s=s%60; return `${m}:${s.toString().padStart(2,'0')}`};
+  const fmtTime=ms=>{if(ms<=0)return'0s';const s=Math.ceil(ms/1000);if(s<60)return s+'s';const m=Math.floor(s/60),rs=s%60;return m+'m'+(rs?(' '+rs+'s'):'')};
+  const fmtTimeLong=ms=>{if(ms<=0)return'0s'; const s=Math.ceil(ms/1000); const h=Math.floor(s/3600); const m=Math.floor((s%3600)/60); const r=s%60; const parts=[]; if(h)parts.push(h+'h'); if(m)parts.push(m+'m'); if(!h && !m)parts.push(r+'s'); return parts.join(' ')};
+  const now=()=>Date.now();
+
+  const SEEDS=[
+    { key:'wheat', name:'Wheat', cost:5, grow:10000, yield:10, color:'#b8860b' },
+    { key:'apple', name:'Apple', cost:50, grow:60000, yield:80, color:'#ef4444' },
+    { key:'blueberry', name:'Blueberry', cost:400, grow:45000, yield:450, color:'#3b82f6' },
+    { key:'banana', name:'Banana', cost:1000, grow:60000, yield:1500, color:'#fde047' },
+    { key:'watermelon', name:'Watermelon', cost:20000, grow:120000, yield:50000, color:'#064e3b' },
+    { key:'lemon', name:'Lemon', cost:1000000, grow:180000, yield:2000000, color:'gold' },
+    { key:'grapefruit', name:'Grapefruit', cost:20000000, grow:120000, yield:40000000, color:'#ffc6a7' },
+    { key:'dragon', name:'Dragon Fruit', cost:500000000, grow:300000, yield:1000000000, color:'#ff7eb6' },
+    { key:'enchanted_grapefruit', name:'Enchanted Grapefruit', cost:25000000000, grow:600000, yield:80000000000, color:'linear-gradient(135deg,#ffffff,#ffc6a7)' },
+    { key:'enchanted_dragon', name:'Enchanted Dragon Fruit', cost:1000000000000, grow:1200000, yield:10000000000000, color:'conic-gradient(from 0deg,#ffffff,#ff7eb6,#fde047,#ffffff)' }
+  ];
+
+  // Upgrades
+  const BOOST_DURATION = 5*60*1000; // 5 minutes
+  const UPGRADES = [
+    { key:'x1_2', name:'1.2× Speed (5m)', mult:1.2, cost:500,     cooldown:3*60*60*1000 },
+    { key:'x1_5', name:'1.5× Speed (5m)', mult:1.5, cost:10000,   cooldown:5*60*60*1000 },
+    { key:'x2',   name:'2× Speed (5m)',   mult:2.0, cost:300000,  cooldown:8*60*60*1000 },
+    { key:'x3',   name:'3× Speed (5m)',   mult:3.0, cost:10000000,cooldown:12*60*60*1000 }
+  ];
+
+  const DEFAULT_STATE={
+    money:100,
+    plots:Array.from({length:9},()=>({state:'empty',seedKey:null,plantedAt:0,readyAt:0})),
+    upgrades:{
+      active:null, // {mult,start,end}
+      lastBuy:{ x1_2:0,x1_5:0,x2:0,x3:0 }
+    },
+    timeCredit:0,   // accumulated "extra time" from boosts
+    lastSync: now() // last time we synced timeCredit
+  };
+
+  let state=loadState();
+
+  function saveState(){localStorage.setItem('farmtycoon_state',JSON.stringify(state));updateMoneyHUD();}
+  function loadState(){
+    try{
+      const raw=localStorage.getItem('farmtycoon_state');
+      if(!raw) return structuredClone(DEFAULT_STATE);
+      const parsed=JSON.parse(raw);
+      // migrations / guards
+      if(!parsed.plots || parsed.plots.length!==9) parsed.plots=structuredClone(DEFAULT_STATE.plots);
+      if(typeof parsed.money!=='number'||!isFinite(parsed.money)) parsed.money=0;
+      if(!parsed.upgrades) parsed.upgrades=structuredClone(DEFAULT_STATE.upgrades);
+      if(!parsed.upgrades.lastBuy) parsed.upgrades.lastBuy=structuredClone(DEFAULT_STATE.upgrades.lastBuy);
+      if(typeof parsed.timeCredit!=='number') parsed.timeCredit=0;
+      if(typeof parsed.lastSync!=='number') parsed.lastSync=now();
+      return parsed;
+    }catch(e){ return structuredClone(DEFAULT_STATE); }
+  }
+
+  // Elements
+  const gridEl=$('#grid'); const moneyEl=$('#money');
+  const shopModal=$('#shopModal'); const shopList=$('#shopList'); const closeShopBtn=$('#closeShop');
+  const upgradeModal=$('#upgradeModal'); const upgradeList=$('#upgradeList'); const closeUpgradeBtn=$('#closeUpgrade');
+  const boostPill=$('#boostPill'); const boostLabel=$('#boostLabel');
+
+  let shopTargetIndex=null;
+
+  function updateMoneyHUD(){moneyEl.textContent=fmtShort(state.money);}
+
+  function buildGrid(){
+    gridEl.innerHTML='';
+    state.plots.forEach((p,i)=>{
+      const t=document.createElement('div');
+      t.className='tile';
+      t.dataset.index=i;
+      ['soil','tag','action','plant','progress'].forEach(cls=>{
+        const el=document.createElement('div'); el.className=cls;
+        if(cls==='progress'){const b=document.createElement('div'); b.className='bar'; el.appendChild(b);}
+        t.appendChild(el);
+      });
+      const btn=document.createElement('button'); btn.onclick=()=>onTileClick(i);
+      t.appendChild(btn);
+      gridEl.appendChild(t);
+    });
+  }
+
+  function onTileClick(i){
+    const p=state.plots[i];
+    if(p.state==='empty') openShop(i);
+    else if(p.state==='ready') harvest(i);
+    else pulseTile(i);
+  }
+  function pulseTile(i){const t=gridEl.children[i]; t.style.transform='scale(0.97)'; setTimeout(()=>t.style.transform='',90);}
+
+  function harvest(i){
+    const p=state.plots[i]; if(p.state!=='ready') return;
+    const s=SEEDS.find(s=>s.key===p.seedKey);
+    state.money+=s.yield;
+    state.plots[i]={state:'empty',seedKey:null,plantedAt:0,readyAt:0};
+    saveState(); render();
+  }
+
+  function plant(i,s){
+    const p=state.plots[i]; if(p.state!=='empty') return;
+    if(state.money<s.cost) return;
+    state.money-=s.cost;
+    const t=now();
+    state.plots[i]={state:'growing',seedKey:s.key,plantedAt:t,readyAt:t+s.grow};
+    saveState(); closeShop(); render();
+  }
+
+  // ---- Time acceleration core ----
+  function syncTimeCredit(){
+    const t=now();
+    const last=state.lastSync||t;
+    const a=state.upgrades.active;
+    if(a){
+      const start=Math.max(last, a.start);
+      const end=Math.min(t, a.end);
+      if(end>start){
+        state.timeCredit += (end - start) * (a.mult - 1);
+      }
+      // auto-expire if past end
+      if(t>=a.end){
+        state.upgrades.active=null;
+      }
+    }
+    state.lastSync=t;
+  }
+  function effectiveNow(){
+    // bring credit up-to-date for this tick, but without mutating twice per render
+    const t=now();
+    let credit=state.timeCredit;
+    const a=state.upgrades.active;
+    if(a){
+      const end=Math.min(t, a.end);
+      if(end>a.start){
+        credit += (end - Math.max(state.lastSync||a.start, a.start)) * (a.mult - 1);
+      }
+    }
+    return t + Math.max(0, credit);
+  }
+
+  function render(){
+    // update boost pill
+    const a=state.upgrades.active;
+    if(a){
+      const remain=a.end - now();
+      if(remain>0){
+        boostPill.classList.add('active');
+        boostLabel.textContent = `Speed ${a.mult.toFixed(1)}× • ${fmtMMSS(remain)}`;
+      }else{
+        boostPill.classList.remove('active');
+        boostLabel.textContent='No boost';
+      }
+    }else{
+      boostPill.classList.remove('active');
+      boostLabel.textContent='No boost';
+    }
+
+    // tiles
+    state.plots.forEach((p,i)=>{
+      const t=gridEl.children[i];
+      const plant=t.querySelector('.plant');
+      const tag=t.querySelector('.tag');
+      const act=t.querySelector('.action');
+      const bar=t.querySelector('.bar');
+
+      if(p.state==='empty'){
+        plant.style.background=''; plant.style.backgroundImage='none';
+        plant.textContent=''; tag.textContent='Empty'; act.textContent='Plant'; bar.style.width='0%';
+      }else{
+        const s=SEEDS.find(s=>s.key===p.seedKey);
+        if(s.color.includes('gradient')){ plant.style.backgroundImage=s.color; plant.style.backgroundColor='transparent'; }
+        else { plant.style.backgroundImage='none'; plant.style.backgroundColor=s.color; }
+        tag.textContent=s.name;
+
+        const ms = p.readyAt - effectiveNow();
+        if(ms<=0){
+          plant.classList.add('ready'); act.textContent='Harvest'; bar.style.width='100%'; plant.textContent='✔'; p.state='ready';
+        }else{
+          plant.classList.remove('ready'); act.textContent=fmtTime(ms);
+          const pct=1- (ms / (p.readyAt - p.plantedAt)); bar.style.width=(Math.max(0, Math.min(1,pct))*100).toFixed(1)+'%';
+          plant.textContent='';
+        }
+      }
+    });
+
+    // upgrade list, if open
+    if(upgradeModal.style.display==='flex') buildUpgradeShop();
+  }
+
+  function tick(){
+    syncTimeCredit(); // accumulate credit based on active boost since last sync
+    render();
+  }
+
+  // ---- Shops ----
+  function openShop(i){shopTargetIndex=i;buildShop();shopModal.style.display='flex';}
+  function closeShop(){shopModal.style.display='none';}
+  closeShopBtn.onclick=closeShop;
+  shopModal.onclick=e=>{if(e.target===shopModal)closeShop();};
+
+  function buildShop(){
+    shopList.innerHTML='';
+    SEEDS.forEach(s=>{
+      const c=document.createElement('div'); c.className='card';
+      const l=document.createElement('div'); l.style.display='flex'; l.style.alignItems='center'; l.style.gap='6px';
+      const sw=document.createElement('div'); sw.className='seed-swatch';
+      if(s.color.includes('gradient')){ sw.style.backgroundImage=s.color; } else { sw.style.background=s.color; }
+      const meta=document.createElement('div');
+      meta.innerHTML=`<div style="font-weight:800">${s.name}</div>
+        <small>Cost: ${fmtShort(s.cost)}</small>
+        <small>Grow: ${fmtTime(s.grow)}</small>
+        <small>Yield: ${fmtShort(s.yield)}</small>`;
+      l.appendChild(sw); l.appendChild(meta);
+
+      const r=document.createElement('div');
+      const b=document.createElement('button'); b.textContent='Plant';
+      if(state.money<s.cost) b.classList.add('disabled');
+      b.onclick=()=>plant(shopTargetIndex,s);
+      r.appendChild(b);
+
+      c.appendChild(l); c.appendChild(r); shopList.appendChild(c);
+    });
+  }
+
+  // Upgrade modal
+  function openUpgrade(){buildUpgradeShop();upgradeModal.style.display='flex';}
+  function closeUpgrade(){upgradeModal.style.display='none';}
+  closeUpgradeBtn.onclick=closeUpgrade;
+  upgradeModal.onclick=e=>{if(e.target===upgradeModal)closeUpgrade();};
+  document.getElementById('upgradeBtn').onclick=openUpgrade;
+
+  function buildUpgradeShop(){
+    upgradeList.innerHTML='';
+    const active=state.upgrades.active;
+    const hasActive = !!(active && active.end>now());
+    UPGRADES.forEach(u=>{
+      const c=document.createElement('div'); c.className='card';
+      const l=document.createElement('div'); l.style.display='flex'; l.style.alignItems='center'; l.style.gap='6px';
+      const sw=document.createElement('div'); sw.className='seed-swatch'; sw.style.background='linear-gradient(135deg,#22d3ee,#3b82f6)';
+      const meta=document.createElement('div');
+
+      const last = state.upgrades.lastBuy[u.key]||0;
+      const nextReadyAt = last + u.cooldown;
+      const cdLeft = nextReadyAt - now();
+
+      const status = cdLeft>0 ? `<small class="warn">Cooldown: ${fmtTimeLong(cdLeft)}</small>` : `<small class="ok">Ready</small>`;
+      meta.innerHTML=`<div style="font-weight:800">${u.name}</div>
+        <small>Cost: ${fmtShort(u.cost)}</small>
+        <small>Duration: 5m</small>
+        ${status}`;
+      l.appendChild(sw); l.appendChild(meta);
+
+      const r=document.createElement('div');
+      const b=document.createElement('button'); b.textContent='Buy';
+      const cantAfford = state.money<u.cost;
+      const inCooldown = cdLeft>0;
+      const blockActive = hasActive; // only one active at a time
+      if(cantAfford || inCooldown || blockActive) b.classList.add('disabled');
+      b.title = blockActive ? 'Another boost is active' : (inCooldown ? 'On cooldown' : (cantAfford?'Not enough money':'')); 
+
+      b.onclick=()=>buyUpgrade(u);
+      r.appendChild(b);
+
+      c.appendChild(l); c.appendChild(r); upgradeList.appendChild(c);
+    });
+  }
+
+  function buyUpgrade(u){
+    // pre-checks
+    const last = state.upgrades.lastBuy[u.key]||0;
+    if(now() < last + u.cooldown) return;
+    if(state.upgrades.active && state.upgrades.active.end>now()) return;
+    if(state.money<u.cost) return;
+
+    // settle current credit before starting new boost
+    syncTimeCredit();
+
+    state.money -= u.cost;
+    const start=now();
+    const end=start + BOOST_DURATION;
+    state.upgrades.active = { mult:u.mult, start, end };
+    state.upgrades.lastBuy[u.key] = start;
+
+    saveState();
+    render();
+  }
+
+  // Reset / Save
+  document.getElementById('saveBtn').onclick=()=>{saveState();};
+  document.getElementById('resetBtn').onclick=()=>{
+    if(confirm('Reset all progress?')){
+      state=structuredClone(DEFAULT_STATE);
+      saveState(); render();
+    }
+  };
+
+  // Build base UI and start loop
+  const moneyElInit=updateMoneyHUD;
+  buildGrid(); updateMoneyHUD(); render();
+
+  // Start ticking
+  setInterval(tick, 200);
+})();
+</script>
+</body>
+</html>
