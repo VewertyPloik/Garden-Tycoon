@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>3×3 Farm Tycoon</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#0f172a;
+    --panel-2:#111827;
+    --ink:#e5e7eb;
+    --muted:#94a3b8;
+    --accent:#22d3ee;
+    --good:#34d399;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --green:#0a3d1a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background: radial-gradient(1200px 600px at 70% -20%, #12203a 0%, var(--bg) 50%, #070b16 100%);
+    color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .app{
+    width:min(980px, 100%); max-width:980px;
+  }
+  .hud{
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; margin-bottom:14px;
+  }
+  .brand{display:flex; align-items:center; gap:10px}
+  .brand .logo{width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#3b82f6, #22d3ee); box-shadow:0 8px 24px rgba(34,211,238,.35), inset 0 0 18px rgba(255,255,255,.12)}
+  .brand h1{font-size:20px; margin:0; letter-spacing:.5px}
+  .money{
+    font-weight:700; font-size:18px; padding:10px 14px; border-radius:14px;
+    background:linear-gradient(180deg, #0b1224, #0a0f1d); border:1px solid #1f2937;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.25);
+  }
+  .controls{display:flex; gap:8px; flex-wrap:wrap}
+  button{cursor:pointer; color:var(--ink); background:linear-gradient(180deg,#1f2937,#0f172a);
+    border:1px solid #263244; padding:10px 12px; border-radius:12px; font-weight:600; letter-spacing:.2px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 8px 20px rgba(0,0,0,.25);
+    transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  button:hover{transform:translateY(-1px)}
+  button:active{transform:translateY(0)}
+  .danger{border-color:#3b1e1e; background:linear-gradient(180deg,#3b1e1e,#2a1616)}
+  .grid-wrap{
+    background:linear-gradient(180deg, #0c162a, #0b1324);
+    border:1px solid #1f2a3b; border-radius:18px; padding:18px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 20px 60px rgba(0,0,0,.35);
+  }
+  .grid{
+    display:grid; grid-template-columns:repeat(3, 1fr); grid-template-rows:repeat(3, 1fr); gap:12px;
+  }
+  .tile{
+    position:relative; aspect-ratio:1/1; border-radius:16px; overflow:hidden; user-select:none;
+    background:linear-gradient(180deg, #0b2a12, #06220d); border:1px solid #0f3d1a;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.25);
+  }
+  .tile button{position:absolute; inset:0; width:100%; height:100%; background:transparent; border:0}
+  .soil{position:absolute; inset:0; background:repeating-linear-gradient( 180deg, #0e4a22 0 6px, #0b3c1b 6px 12px); opacity:.25}
+  .plant{
+    position:absolute; width:64%; height:64%; left:18%; top:18%; border-radius:10px; box-shadow:0 10px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.06);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#000; text-shadow: 0 1px 0 rgba(255,255,255,.3);
+  }
+  .plant.ready{outline:3px solid var(--good)}
+  .progress{position:absolute; left:10px; right:10px; bottom:10px; height:8px; border-radius:6px; overflow:hidden; background:#0b1b34; border:1px solid #1b2b43}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg, #22c55e, #a3e635)}
+  .tag{position:absolute; top:8px; left:8px; font-size:11px; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.08); color:var(--muted)}
+  .action{position:absolute; right:8px; top:8px; font-size:11px; padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);}
+
+  /* Modal */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center}
+  .modal{width:min(720px, 100%); background:linear-gradient(180deg,#0b1224,#0a0f1d); border:1px solid #1f2937; border-top-left-radius:18px; border-top-right-radius:18px; padding:16px 16px 10px; box-shadow:0 -20px 60px rgba(0,0,0,.45)}
+  .modal h2{margin:6px 8px 8px; font-size:18px}
+  .shop{display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); padding:8px}
+  .card{padding:12px; border-radius:14px; border:1px solid #263244; background:linear-gradient(180deg,#121a2e,#0f172a); display:flex; gap:10px; align-items:center; justify-content:space-between}
+  .seed-swatch{width:32px; height:32px; border-radius:8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 4px 12px rgba(0,0,0,.35)}
+  .card small{display:block; color:var(--muted)}
+  .close-row{display:flex; justify-content:flex-end; padding:6px 8px 2px}
+  .ghost{background:transparent; border-color:#263244}
+  .disabled{opacity:.5; pointer-events:none}
+
+  @media (min-width:740px){ .modal-backdrop{align-items:center} .modal{border-radius:18px} }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="hud">
+      <div class="brand"><div class="logo"></div><h1>3×3 Farm Tycoon</h1></div>
+      <div class="money" id="money">$0</div>
+      <div class="controls">
+        <button id="saveBtn" title="Force save">💾 Save</button>
+        <button id="resetBtn" class="danger" title="Reset all progress">♻️ Reset</button>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Seed Shop -->
+  <div class="modal-backdrop" id="shopModal">
+    <div class="modal">
+      <h2>Seed Shop</h2>
+      <div class="shop" id="shopList"></div>
+      <div class="close-row">
+        <button class="ghost" id="closeShop">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // --- Utilities ---
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const fmtShort = (n)=>{
+    const abs = Math.abs(n);
+    if(abs >= 1e12) return `$${(n/1e12).toFixed(3).replace(/\.0+$/,'')}T`;
+    if(abs >= 1e9)  return `$${(n/1e9).toFixed(3).replace(/\.0+$/,'')}B`;
+    if(abs >= 1e6)  return `$${(n/1e6).toFixed(2).replace(/\.0+$/,'')}M`;
+    if(abs >= 1e3)  return `$${(n/1e3).toFixed(1).replace(/\.0+$/,'')}K`;
+    return `$${Math.floor(n).toLocaleString()}`;
+  };
+  const fmtTime = (ms)=>{
+    if(ms <= 0) return '0s';
+    const s = Math.ceil(ms/1000);
+    if(s < 60) return s + 's';
+    const m = Math.floor(s/60), rs = s%60;
+    return m + 'm' + (rs? (' ' + rs + 's') : '');
+  };
+  const now = ()=> Date.now();
+
+  // --- Seed Data ---
+  // Note: "M"/"m" interpreted as minutes
+  const SEEDS = [
+    { key:'wheat', name:'Wheat', cost:5, grow:10_000,     yield:10,   color:'#b8860b' }, // dark yellow
+    { key:'apple', name:'Apple', cost:50, grow:60_000,    yield:80,   color:'#ef4444' }, // red
+    { key:'blueberry', name:'Blueberry', cost:400, grow:45_000, yield:450, color:'#3b82f6' }, // blue
+    { key:'banana', name:'Banana', cost:1_000, grow:60_000, yield:1_500, color:'#fde047' }, // bright yellow
+    { key:'watermelon', name:'Watermelon', cost:20_000, grow:120_000, yield:50_000, color:'#064e3b' }, // dark green
+    { key:'lemon', name:'Lemon', cost:1_000_000, grow:180_000, yield:2_000_000, color:'gold' }, // gold
+    { key:'grapefruit', name:'Grapefruit', cost:20_000_000, grow:120_000, yield:40_000_000, color:'#ffc6a7' }, // peach
+    { key:'dragon', name:'Dragon Fruit', cost:500_000_000, grow:300_000, yield:1_000_000_000, color:'#ff7eb6' }, // pink
+    { key:'enchanted_grapefruit', name:'Enchanted Grapefruit', cost:25_000_000_000, grow:600_000, yield:80_000_000_000, color:'linear-gradient(135deg, #ffffff, #ffc6a7)' }, // white + peach
+    { key:'enchanted_dragon', name:'Enchanted Dragon Fruit', cost:1_000_000_000_000, grow:1_200_000, yield:10_000_000_000_000, color:'conic-gradient(from 0deg, #ffffff, #ff7eb6, #fde047, #ffffff)' } // white + pink + yellow
+  ];
+
+  // --- State ---
+  const DEFAULT_STATE = {
+    money: 100, // a tiny starting fund
+    plots: Array.from({length:9}, ()=>({
+      state:'empty', // 'empty' | 'growing' | 'ready'
+      seedKey:null,
+      plantedAt:0,
+      readyAt:0
+    }))
+  };
+
+  let state = loadState();
+
+  function saveState(){
+    localStorage.setItem('farmtycoon_state', JSON.stringify(state));
+    updateMoneyHUD();
+  }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem('farmtycoon_state');
+      if(!raw) return structuredClone(DEFAULT_STATE);
+      const parsed = JSON.parse(raw);
+      // Ensure shape
+      if(!parsed.plots || parsed.plots.length!==9) parsed.plots = structuredClone(DEFAULT_STATE.plots);
+      if(typeof parsed.money !== 'number' || !isFinite(parsed.money)) parsed.money = 0;
+      return parsed;
+    }catch(e){ return structuredClone(DEFAULT_STATE); }
+  }
+
+  // --- DOM Build ---
+  const gridEl = $('#grid');
+  const moneyEl = $('#money');
+  const shopModal = $('#shopModal');
+  const shopList = $('#shopList');
+  const closeShopBtn = $('#closeShop');
+
+  let shopTargetIndex = null; // which plot we're planting into
+
+  function updateMoneyHUD(){ moneyEl.textContent = fmtShort(state.money); }
+
+  function buildGrid(){
+    gridEl.innerHTML = '';
+    state.plots.forEach((plot, idx)=>{
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.dataset.index = idx;
+
+      const soil = document.createElement('div');
+      soil.className = 'soil';
+      tile.appendChild(soil);
+
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tile.appendChild(tag);
+
+      const act = document.createElement('div');
+      act.className = 'action';
+      tile.appendChild(act);
+
+      const plant = document.createElement('div');
+      plant.className = 'plant';
+      tile.appendChild(plant);
+
+      const prog = document.createElement('div');
+      prog.className = 'progress';
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      prog.appendChild(bar);
+      tile.appendChild(prog);
+
+      const btn = document.createElement('button');
+      btn.addEventListener('click', ()=> onTileClick(idx));
+      tile.appendChild(btn);
+
+      gridEl.appendChild(tile);
+    });
+  }
+
+  function onTileClick(index){
+    const plot = state.plots[index];
+    if(plot.state === 'empty'){
+      openShop(index);
+    } else if(plot.state === 'ready'){
+      harvest(index);
+    } else {
+      // Growing: do nothing for now (tap to view time?)
+      // We could show a toast; instead, brief pulse
+      pulseTile(index);
+    }
+  }
+
+  function pulseTile(index){
+    const tile = gridEl.children[index];
+    tile.style.transform = 'scale(0.99)';
+    setTimeout(()=> tile.style.transform='', 90);
+  }
+
+  function harvest(index){
+    const plot = state.plots[index];
+    if(plot.state !== 'ready') return;
+    const seed = SEEDS.find(s=>s.key===plot.seedKey);
+    state.money += seed.yield;
+    state.plots[index] = { state:'empty', seedKey:null, plantedAt:0, readyAt:0 };
+    showPop(index, `+${fmtShort(seed.yield)}`, 'gain');
+    saveState();
+    render();
+  }
+
+  function plant(index, seed){
+    const plot = state.plots[index];
+    if(plot.state!=='empty') return;
+    if(state.money < seed.cost){
+      showPop(index, 'Not enough $', 'warn');
+      return;
+    }
+    state.money -= seed.cost;
+    const t = now();
+    state.plots[index] = { state:'growing', seedKey:seed.key, plantedAt:t, readyAt:t + seed.grow };
+    saveState();
+    closeShop();
+    render();
+  }
+
+  function showPop(index, text, type){
+    const tile = gridEl.children[index];
+    const pop = document.createElement('div');
+    pop.textContent = text;
+    pop.style.position='absolute';
+    pop.style.left='50%'; pop.style.top='50%';
+    pop.style.transform='translate(-50%,-50%)';
+    pop.style.padding='6px 10px';
+    pop.style.border='1px solid rgba(255,255,255,.2)';
+    pop.style.borderRadius='999px';
+    pop.style.background='rgba(0,0,0,.35)';
+    pop.style.fontWeight='800';
+    pop.style.fontSize='12px';
+    pop.style.zIndex='5';
+    if(type==='gain') pop.style.color = '#a7f3d0';
+    if(type==='warn') pop.style.color = '#fde68a';
+    tile.appendChild(pop);
+    setTimeout(()=>{pop.style.transition='all .5s ease'; pop.style.opacity='0'; pop.style.transform='translate(-50%,-70%)';}, 40);
+    setTimeout(()=> pop.remove(), 700);
+  }
+
+  function render(){
+    state.plots.forEach((plot, idx)=>{
+      const tile = gridEl.children[idx];
+      const plant = tile.querySelector('.plant');
+      const tag = tile.querySelector('.tag');
+      const act = tile.querySelector('.action');
+      const bar = tile.querySelector('.bar');
+
+      if(plot.state==='empty'){
+        plant.style.background=''; plant.textContent=''; plant.classList.remove('ready');
+        tag.textContent='Empty';
+        act.textContent='Plant';
+        bar.style.width='0%';
+      } else {
+        const seed = SEEDS.find(s=>s.key===plot.seedKey);
+        // Apply color (allow gradients)
+        if(seed.color.includes('gradient')){
+          plant.style.backgroundImage = seed.color; plant.style.backgroundColor='transparent';
+        } else {
+          plant.style.backgroundImage='none'; plant.style.backgroundColor = seed.color;
+        }
+        tag.textContent = seed.name;
+        const msLeft = plot.readyAt - now();
+        if(msLeft <= 0){
+          // Ready
+          plant.classList.add('ready');
+          act.textContent = 'Harvest';
+          bar.style.width = '100%';
+          plant.textContent = '✔';
+          plot.state='ready';
+        } else {
+          plant.classList.remove('ready');
+          act.textContent = fmtTime(msLeft);
+          const total = seed.grow;
+          const pct = Math.max(0, Math.min(1, 1 - (msLeft/total)));
+          bar.style.width = (pct*100).toFixed(1)+'%';
+          plant.textContent = '';
+        }
+      }
+    });
+  }
+
+  function tick(){ render(); }
+
+  // --- Shop ---
+  function openShop(index){
+    shopTargetIndex = index;
+    buildShop();
+    shopModal.style.display='flex';
+  }
+  function closeShop(){ shopModal.style.display='none'; }
+  closeShopBtn.addEventListener('click', closeShop);
+  shopModal.addEventListener('click', (e)=>{ if(e.target===shopModal) closeShop(); });
+
+  function buildShop(){
+    shopList.innerHTML='';
+    SEEDS.forEach(seed=>{
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const left = document.createElement('div');
+      left.style.display='flex'; left.style.alignItems='center'; left.style.gap='10px';
+
+      const sw = document.createElement('div');
+      sw.className = 'seed-swatch';
+      if(seed.color.includes('gradient')){ sw.style.backgroundImage = seed.color; }
+      else { sw.style.background = seed.color; }
+
+      const meta = document.createElement('div');
+      meta.innerHTML = `<div style="font-weight:800">${seed.name}</div>
+        <small>Cost: ${fmtShort(seed.cost)}</small>
+        <small>Grow: ${fmtTime(seed.grow)}</small>
+        <small>Yield: ${fmtShort(seed.yield)}</small>`;
+
+      left.appendChild(sw); left.appendChild(meta);
+
+      const right = document.createElement('div');
+      const btn = document.createElement('button');
+      btn.textContent = 'Plant';
+      if(state.money < seed.cost) btn.classList.add('disabled');
+      btn.addEventListener('click', ()=> plant(shopTargetIndex, seed));
+      right.appendChild(btn);
+
+      card.appendChild(left); card.appendChild(right);
+      shopList.appendChild(card);
+    });
+  }
+
+  // --- Buttons ---
+  $('#saveBtn').addEventListener('click', saveState);
+  $('#resetBtn').addEventListener('click', ()=>{
+    if(confirm('Reset all progress?')){
+      state = structuredClone(DEFAULT_STATE);
+      saveState();
+      render();
+    }
+  });
+
+  // --- Init ---
+  buildGrid();
+  updateMoneyHUD();
+  render();
+  setInterval(tick, 200);
+})();
+</script>
+</body>
+</html>
